@@ -1,0 +1,146 @@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                          %
+%    BAYESIAN ESTIMATION, ANALYSIS AND REGRESSION (BEAR) TOOLBOX           %
+%                                                                          %
+%    This statistical package has been developed by the external           %
+%    developments division of the European Central Bank.                   %
+%                                                                          %
+%    Authors:                                                              %
+%    Alistair Dieppe (alistair.dieppe@ecb.europa.eu)                       %
+%    Björn van Roye  (Bjorn.van_Roye@ecb.europa.eu)                        %
+%                                                                          %
+%    Version 5.0                                                           %
+%                                                                          %
+% The updated version 5 of BEAR has benefitted from contributions from     %
+%   Boris Blagov, Marius Schulte and Ben Schumann.                         %
+%                                                                          %
+%  This version builds-upon previous versions where Romain Legrand was     %
+%   instrumental in developing BEAR.                                       %
+%                                                                          %
+%    The authors are grateful to the following people for valuable input   %
+%    and advice which contributed to improve the quality of the toolbox:   %
+%    Paolo Bonomolo, Mirco Balatti, Marta Banbura, Niccolo Battistini,     %
+%	 Gabriel Bobeica, Martin Bruns, Fabio Canova, Matteo Ciccarelli,       %
+%    Marek Jarocinski, Michele Lenza, Francesca Loria, Mirela Miescu,      %
+%    Gary Koop, Chiara Osbat, Giorgio Primiceri, Martino Ricci,            %
+%    Michal Rubaszek, Barbara Rossi, Fabian Schupp,                        %
+%    Peter Welz and Hugo Vega de la Cruz. 						           %
+%                                                                          %
+%    These programmes are the responsibilities of the authors and not of   %
+%    the ECB and all errors and ommissions remain those of the authors.    %
+%                                                                          %
+%    Using the BEAR toolbox implies acceptance of the End User Licence     %
+%    Agreement and appropriate acknowledgement should be made.             %
+%                                                                          %
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+BEAR toolbox estimates
+Date: 06-Jul-2025   Time: 14:48
+
+
+Time-varying BVAR
+Time-varing BVAR: general
+structural decomposition: choleski factorisation
+endogenous variables:  YER  HICSA  STN 
+exogenous variables:  constant 
+estimation sample: 1974q1-2014q4
+sample size (omitting initial conditions): 160
+AR coefficient on residual variance (gamma):    0.85
+IG shape on residual variance (alpha0):         0.001
+IG scale on residual variance (delta0):         0.001
+
+
+
+VAR coefficients (beta): posterior estimates
+
+Endogenous: YER
+                                   Median          St.dev       Low.bound       Upp.bound
+                  YER(-1)           0.229           0.099           0.130           0.323
+                  YER(-2)           0.078           0.101          -0.022           0.177
+                  YER(-3)           0.094           0.102          -0.007           0.196
+                  YER(-4)           0.084           0.098          -0.016           0.179
+                HICSA(-1)           0.240           0.192           0.027           0.424
+                HICSA(-2)          -0.079           0.195          -0.260           0.122
+                HICSA(-3)          -0.394           0.203          -0.598          -0.198
+                HICSA(-4)          -0.206           0.203          -0.415          -0.011
+                  STN(-1)          -0.050           0.116          -0.170           0.064
+                  STN(-2)          -0.165           0.162          -0.327           0.000
+                  STN(-3)          -0.047           0.155          -0.209           0.104
+                  STN(-4)           0.110           0.106           0.005           0.218
+                 Constant           0.545           0.172           0.386           0.720
+
+Sum of squared residuals: 33.38
+R-squared: 0.454
+adj. R-squared: 0.410
+
+
+Endogenous: HICSA
+                                   Median          St.dev       Low.bound       Upp.bound
+                  YER(-1)           0.131           0.066           0.068           0.199
+                  YER(-2)           0.025           0.066          -0.040           0.095
+                  YER(-3)           0.013           0.067          -0.058           0.084
+                  YER(-4)          -0.003           0.062          -0.066           0.056
+                HICSA(-1)           0.277           0.106           0.170           0.380
+                HICSA(-2)          -0.168           0.111          -0.277          -0.057
+                HICSA(-3)           0.294           0.118           0.176           0.410
+                HICSA(-4)           0.011           0.118          -0.107           0.133
+                  STN(-1)           0.040           0.079          -0.037           0.119
+                  STN(-2)          -0.052           0.093          -0.148           0.039
+                  STN(-3)           0.079           0.091          -0.014           0.170
+                  STN(-4)          -0.007           0.073          -0.080           0.066
+                 Constant           0.124           0.105           0.027           0.237
+
+Sum of squared residuals: 6.91
+R-squared: 0.899
+adj. R-squared: 0.891
+
+
+Endogenous: STN
+                                   Median          St.dev       Low.bound       Upp.bound
+                  YER(-1)           0.202           0.093           0.108           0.292
+                  YER(-2)           0.190           0.098           0.089           0.286
+                  YER(-3)           0.117           0.101           0.021           0.219
+                  YER(-4)           0.073           0.089          -0.018           0.156
+                HICSA(-1)           0.694           0.178           0.520           0.868
+                HICSA(-2)          -0.389           0.182          -0.568          -0.218
+                HICSA(-3)           0.089           0.191          -0.095           0.285
+                HICSA(-4)          -0.075           0.185          -0.253           0.113
+                  STN(-1)           1.049           0.112           0.935           1.161
+                  STN(-2)          -0.295           0.149          -0.453          -0.151
+                  STN(-3)           0.031           0.148          -0.112           0.178
+                  STN(-4)           0.131           0.101           0.031           0.226
+                 Constant          -0.162           0.161          -0.324           0.001
+
+Sum of squared residuals: 25.40
+R-squared: 0.991
+adj. R-squared: 0.990
+
+
+Roots of the characteristic polynomial (modulus):
+0.850  0.581  0.342
+0.850  0.527  0.342
+0.692  0.512  0.223
+0.692  0.512  0.066
+No root lies outside the unit circle.
+The estimated VAR model satisfies the stability condition
+
+
+sigma (residual covariance matrix): posterior estimates
+ 0.290   0.027   0.054  
+ 0.027   0.070   0.031  
+ 0.054   0.031   0.245  
+Note: estimates rely on long-run (homoskedastic) values
+
+
+D (structural decomposition matrix): posterior estimates
+ 0.538   0.000   0.000  
+ 0.051   0.260   0.000  
+ 0.101   0.100   0.473  
+
+
+gamma (structural disturbances covariance matrix): posterior estimates
+ 1.000   0.000   0.000  
+ 0.000   1.000   0.000  
+ 0.000   0.000   1.000  
