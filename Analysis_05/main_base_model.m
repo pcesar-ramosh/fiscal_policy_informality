@@ -4,7 +4,7 @@
 %   - IVA tau_c (ambos), impuesto laboral tau_l (solo formales)
 %   - Transferencias Tr_i = phi * y_i (solo informales)
 %   - Bien público Gov en utilidad (exógeno baseline)
-%   - r endógeno por clearing con B(r) del presupuesto público
+%   - r endógeno por    clearing con B(r) del presupuesto público
 %   - Exporta CSVs y grafica políticas, bonos por tipo, y r vs. informalidad
 %
 %  Requiere:
