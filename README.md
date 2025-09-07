@@ -6,9 +6,10 @@ This repository contains the research project *“Fiscal Policy Effects on Wealt
 Our work builds on and extends the model proposed by **Galindo et al. (2024)**, incorporating consumption taxes and targeted transfers to analyze the distributional effects of fiscal policy in economies with high informality.
 
 ## 👥 Authors
+Advisor: **Prof. Hamilton Galindo Gil, Ph.D.**
 - **Ian Carrasco Tufino**  
 - **Paulo Cesar Ramos Huarachi**  
-Advisor: **Prof. Hamilton Galindo Gil, Ph.D.**
+
 
 ## 🎯 Research Question
 > *What are the effects of fiscal policy on wealth and consumption distribution in an economy with high informality?*
