@@ -3,7 +3,7 @@
 ## 📖 Overview
 This repository contains the research project *“Fiscal Policy Effects on Wealth Distribution and Consumption under High Informality using a Heterogeneous-Agents Model”*, developed as part of our Master's thesis at the **Universidad Nacional de Ingeniería (UNI), Lima, Peru**.
 
-Our work builds on and extends the model proposed by **Galindo et al. (2024)**, incorporating consumption taxes and targeted transfers to analyze the distributional effects of fiscal policy in economies with high informality.
+Our work builds on and extends the model proposed by **Galindo et al. (2024)**, incorporating consumption and income taxes and targeted transfers to analyze the distributional effects of fiscal policy in economies with high informality.
 
 ## 👥 Authors
 Advisor: **Prof. Hamilton Galindo Gil, Ph.D.**
