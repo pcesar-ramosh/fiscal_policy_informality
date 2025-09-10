@@ -1,4 +1,4 @@
-%% stats_Eta_v2 (ADAPTADO AL MODELO BASE)
+%% stats_Eta_v2 (ADAPTADO MODELO BASE)
 clear; clc;
 
 RRA = 4.20;
