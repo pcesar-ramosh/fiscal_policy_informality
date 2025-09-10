@@ -7,8 +7,8 @@ function [r_opt, ir, pop1_vector, statsMatrix, statsCMatrix, ...
 % - Impuesto laboral tau_l (solo formales)
 % - IVA tau_c (ambos)
 % - Transferencias phi*y1 (solo informales)
-% - Bien público Gov entra a la utilidad (aditivo)
-% - Prima theta: informales con a<0 enfrentan r+theta
+% - Bien público Gov entra a la utilidad (aditivo) como Logartimo
+% - Prima theta: informales con a<0 enfrentan r+theta ()
 % - Deuda pública B(r) = (Tl + Tc - G - Tr) / r  y clearing: ∫ a g(a) da = B(r)
 % Salidas compatibles con tus scripts legacy (C, Saving, Distribution, etc.)
 % -------------------------------------------------------------------------
@@ -17,8 +17,8 @@ tic;
 
 %% --- Política y calibración base (LATAM emergente)
 tau_l  = 0.15;    % impuesto laboral (formales)
-tau_c  = 0.10;    % IVA (ambos)
-phi    = 0.15;    % transferencias (solo informales, proporcionales a y1)
+tau_c  = 0.15;    % IVA (ambos)
+phi    = 0.10;    % transferencias (solo informales, proporcionales a y1)
 Gov    = 0.07;    % bien público (entra a utilidad como shifter)
 theta  = 0.02;    % prima de endeudamiento informal (a<0)
 
