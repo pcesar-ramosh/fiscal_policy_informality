@@ -9,7 +9,7 @@
 clear; clc; close all;
 
 % ----------- PARÁMETROS COMUNES ------------
-RRA = 4.20;                 % RRA misma para I/F (puedes diferenciar si quieres)
+RRA = 2.30;                 % RRA misma para I/F (puedes diferenciar si quieres)
 eta_target = 0.64;          % Tamaño objetivo de informalidad (legacy)
 theta = 0.02; rho=0.05;
 
