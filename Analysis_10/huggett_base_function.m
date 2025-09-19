@@ -1,4 +1,4 @@
-function out = huggett_base_covid_function(params)
+function out = huggett_base_function(params)
 % -------------------------------------------------------------------------
 % Modelo Huggett con 2 tipos (Informal/Formal) + impuestos y transferencias
 % - tau_l: impuesto laboral (solo formales)
@@ -8,22 +8,23 @@ function out = huggett_base_covid_function(params)
 % - theta: prima de endeudamiento informal (tasa r+theta si a<0)
 % - B(r) endógena cierra el presupuesto: B = (Tl + Tc - G - Tr)/r
 % - Transiciones ocupacionales:
-%     * Por defecto (sin params.lambdaSpec): λ2 constante a partir de p22,
-%       y λ1 = ((1-eta_target)/eta_target) * λ2  (replica tu legacy).
+%     * Por defecto: λ2 constante a partir de p22_bar, y
+%       λ1 = ((1-eta_target)/eta_target) * λ2  (fija informalidad objetivo).
 %     * Con params.lambdaSpec.mode='custom': usa la1_fun(a,eta), la2_fun(a,eta).
 %
 % ENTRADA: struct params con (valores por defecto entre []):
-%   RRA_I [4.2], RRA_F [4.2], rho [0.05], theta [0.02]
-%   tau_l [0.15], tau_c [0.10], phi [0.15], Gov [0.07]
+%   RRA_I [2.3], RRA_F [2.3], rho [0.05], theta [0.02]
+%   tau_l [0.15], tau_c [0.15], phi [0.10], Gov [0.05]
 %   z1 [0.33], z2 [1.0]
 %   I [700], amin [-0.30*z1], amax [5], r_guess [0.03], rmin [0.005], rmax [0.08]
-%   p22_bar [0.8155], eta_target [0.64]
-%   lambdaSpec (opcional): struct con .mode='custom', .la1_fun, .la2_fun
+%   p22_bar [0.8155], eta_target [0.54]
+%   fix_r [0]  (0 = busca r por clearing; 1 = usa r fijo sin bisección)
+%   lambdaSpec (opcional): struct .mode='custom', .la1_fun(a,eta), .la2_fun(a,eta)
 %
-% SALIDA: struct out con campos:
+% SALIDA: struct out con:
 %   r, a, g (I x 2), c (I x 2), s (I x 2), popI, popF, Ctot, Y
 %   fiscal: Tl, Tc, Tr, G, PB, B, rB, BB
-%   stats: wealth/cons (medias, medianas, Gini por tipo y total)
+%   stats: wealth/cons (medias, medianas, Gini por tipo y total), p11
 %   borrowers: fracciones y montos (por tipo) para a<0 y a>0
 % -------------------------------------------------------------------------
 
@@ -31,23 +32,22 @@ function out = huggett_base_covid_function(params)
 arg = @(f,def) (isfield(params,f) && ~isempty(params.(f))) * params.(f) + ...
                ~(isfield(params,f) && ~isempty(params.(f))) * def;
 
-sI    = arg('RRA_I', 4.2);
-sF    = arg('RRA_F', 4.2);
+sI    = arg('RRA_I', 2.3);
+sF    = arg('RRA_F', 2.3);
 rho   = arg('rho',   0.05);
 theta = arg('theta', 0.02);
 
 tau_l = arg('tau_l', 0.15);
-tau_c = arg('tau_c', 0.10);
-phi   = arg('phi',   0.15);
-Gov   = arg('Gov',   0.07);
+tau_c = arg('tau_c', 0.15);
+phi   = arg('phi',   0.10);
+Gov   = arg('Gov',   0.05);
 
 z1    = arg('z1',    0.33);
 z2    = arg('z2',    1.00);
 z     = [z1, z2];
 
 I     = arg('I',     700);
-amin  = arg('amin', -0.50*z1);
-%amin  = arg('amin', -0.30*z1);
+amin  = arg('amin', -0.30*z1);
 amax  = arg('amax',  5.0);
 a     = linspace(amin, amax, I)'; 
 da    = (amax-amin)/(I-1);
@@ -57,9 +57,10 @@ zz    = ones(I,1) * z;
 r     = arg('r_guess', 0.03);
 rmin  = arg('rmin',     0.005);
 rmax  = arg('rmax',     0.08);
+fix_r = arg('fix_r',    0);     % <---- NUEVO
 
 p22_bar    = arg('p22_bar', 0.8155);
-eta_target = arg('eta_target', 0.64);
+eta_target = arg('eta_target', 0.54);
 
 useCustomLambda = (isfield(params,'lambdaSpec') && isstruct(params.lambdaSpec) && ...
                    isfield(params.lambdaSpec,'mode') && strcmpi(params.lambdaSpec.mode,'custom'));
@@ -68,8 +69,8 @@ if useCustomLambda
     la2_fun = params.lambdaSpec.la2_fun;  % la2_fun(a, eta_guess)
 end
 
-%% ----- Iteración HJB + búsqueda de r
-maxit = 100; crit = 1e-6; Delta = 1000;
+%% ----- Iteración HJB + búsqueda de r (o r fijo)
+maxit = 200; crit = 1e-6; Delta = 1000;
 Ir    = 1000; crit_S = 1e-5;
 
 % Lambda inicial
@@ -88,7 +89,7 @@ end
 Aswitch = [ -spdiags(L1_vec,0,I,I),  spdiags(L1_vec,0,I,I);
              spdiags(L2_vec,0,I,I), -spdiags(L2_vec,0,I,I) ];
 
-% Valor inicial (simple y estable)
+% Valor inicial (consumo de todo ingreso y Gov en flujo)
 rr = r*ones(I,1); rr(a<0) = r + theta;
 v0(:,1) = ((((1-0)*zz(:,1) + rr.*a + phi*z1)/(1+tau_c)).^(1-sI)/(1-sI) + Gov)/rho;
 v0(:,2) = ((((1-tau_l)*zz(:,2) + r .*a          )/(1+tau_c)).^(1-sF)/(1-sF) + Gov)/rho;
@@ -108,7 +109,7 @@ for ir = 1:Ir
         dVb(1,1)   = ((1-0)*z1 + (r+theta)*amin)^(-sI);
         dVb(1,2)   = ((1-tau_l)*z2 + r*amin)^(-sF);
 
-        % tasas efectivas (informal paga prima si a<0)
+        % tasas efectivas
         rr = r*ones(I,1); rr(a<0) = r + theta;
 
         % “recursos” (lado derecho de BC sin consumo)
@@ -123,7 +124,7 @@ for ir = 1:Ir
         c0  = [res_inf, res_for];
 
         If = ssf>0; Ib = ssb<0; I0 = (1-If-Ib);
-        c  = cf.*If + cb.*Ib + c0.*(I0/(1+tau_c));  % si drift≈0, c = res/(1+tau_c)
+        c  = cf.*If + cb.*Ib + c0.*(I0/(1+tau_c));  % drift≈0 -> c = res/(1+tau_c)
 
         u = [c(:,1).^(1-sI)/(1-sI), c(:,2).^(1-sF)/(1-sF)] + Gov.*ones(I,2);
 
@@ -135,7 +136,7 @@ for ir = 1:Ir
         A  = [A1, sparse(I,I); sparse(I,I), A2] + Aswitch;
         A  = A - spdiags(sum(A,2),0,2*I,2*I);
 
-        % resolver HJB estacionario
+        % resolver HJB estacionario (implícito)
         Bmat = (1/Delta + rho)*speye(2*I) - A;
         u_stacked = [u(:,1);u(:,2)];
         V_stacked = [V(:,1);V(:,2)];
@@ -170,7 +171,7 @@ for ir = 1:Ir
     Btarget = (Tl + Tc - (Gx + Tr)) / max(r,1e-9);
     S = g(:,1)'*a*da + g(:,2)'*a*da - Btarget;
 
-    % Si λ depende de composición, actualiza y repite bisección
+    % Si λ depende de composición, actualiza y repetir dentro del lazo
     if useCustomLambda
         L1_vec = max(la1_fun(a, popI), 1e-10);
         L2_vec = max(la2_fun(a, popI), 1e-10);
@@ -178,18 +179,23 @@ for ir = 1:Ir
                      spdiags(L2_vec,0,I,I), -spdiags(L2_vec,0,I,I) ];
     end
 
-    if S >  crit_S
-        rmax = r; r = 0.5*(r + rmin);
-    elseif S < -crit_S
-        rmin = r; r = 0.5*(r + rmax);
+    % ---- Búsqueda de r o r fijo
+    if ~fix_r
+        if S >  crit_S
+            rmax = r; r = 0.5*(r + rmin);
+        elseif S < -crit_S
+            rmin = r; r = 0.5*(r + rmax);
+        else
+            break
+        end
+
+        % actualiza valor inicial para próxima iteración de r
+        rr = r*ones(I,1); rr(a<0) = r + theta;
+        v0(:,1) = ((((1-0)*zz(:,1) + rr.*a + phi*z1)/(1+tau_c)).^(1-sI)/(1-sI) + Gov)/rho;
+        v0(:,2) = ((((1-tau_l)*zz(:,2) + r .*a          )/(1+tau_c)).^(1-sF)/(1-sF) + Gov)/rho;
     else
         break
     end
-
-    % actualiza valor inicial para próxima iteración de r
-    rr = r*ones(I,1); rr(a<0) = r + theta;
-    v0(:,1) = ((((1-0)*zz(:,1) + rr.*a + phi*z1)/(1+tau_c)).^(1-sI)/(1-sI) + Gov)/rho;
-    v0(:,2) = ((((1-tau_l)*zz(:,2) + r .*a          )/(1+tau_c)).^(1-sF)/(1-sF) + Gov)/rho;
 end
 
 % ---- Resultados fiscales finales
@@ -199,7 +205,6 @@ BB = PB - rB;
 Y  = z1*popI + z2*popF;
 
 % ---- Estadísticas de riqueza y consumo
-% riqueza
 wI_mean = wmean(a, g(:,1), da);
 wF_mean = wmean(a, g(:,2), da);
 wT_mean = wmean(a, g(:,1)+g(:,2), da);
@@ -210,7 +215,6 @@ gini_I  = giniW(a, g(:,1), da);
 gini_F  = giniW(a, g(:,2), da);
 gini_T  = giniW(a, g(:,1)+g(:,2), da);
 
-% consumo
 cI_mean = wmean(c(:,1), g(:,1), da);
 cF_mean = wmean(c(:,2), g(:,2), da);
 cT_mean = wmean(c(:,1)+c(:,2), g(:,1)+g(:,2), da);
@@ -255,9 +259,9 @@ out.stats  = struct( ...
 
 out.borrowers = struct( ...
     'fracBorrow',[fracBorrow_I fracBorrow_F], ...
-    'fracLend',  [fracLend_I fracLend_F], ...
-    'volBorrow', [volBorrow_I volBorrow_F], ...
-    'volLend',   [volLend_I volLend_F] ...
+    'fracLend',  [fracLend_I   fracLend_F], ...
+    'volBorrow', [volBorrow_I  volBorrow_F], ...
+    'volLend',   [volLend_I    volLend_F] ...
 );
 
 end
