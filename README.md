@@ -30,6 +30,7 @@ Advisor: **Prof. Hamilton Galindo Gil, Ph.D.**
   - Consumption taxes (all agents)  
   - Targeted transfers to informal agents  
 - Informality is exogenous and calibrated (Loayza, 2018; World Bank, 2022; IMF, 2024).  
+  - We will try to extend the model allowing varying this informality probability (lambda) in future work.
 
 ## 🔬 Methodology
 - Model solved using **HJB and Fokker-Planck equations**.  
