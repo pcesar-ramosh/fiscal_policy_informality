@@ -1,27 +1,27 @@
 %% main_base_only.m
-% Ejecuta el modelo BASE (sin shocks) y produce:
-% - CSVs con: (i) cuentas fiscales, (ii) mercado de activos, (iii) estadisticas hogar,
+% Modelo BASE (sin shocks ni anaálisis de sensibilidad) produce:
+% - CSVs con: (i) cuentas fiscales, (ii) mercado de activos, (iii) estadisticas,
 %             (iv) prestatarios/prestamistas
-% - Graficos: politicas c(a), s(a), densidades g, mercado de activos,
-%             cuentas fiscales (ingresos/gastos), Lorenz de riqueza, prestatarios/prestamistas.
+% - Graficos: funciones de politica c(a), s(a), densidades g, mercado de activos,
+%             cuentas fiscales (ingresos/gastos), Curva de Lorenz de riqueza, prestatarios/prestamistas.
 clear; clc; close all;
 
 %% ===== 1) PARÁMETROS BASE =====
-RRA   = 2.30;         % RRA_I = RRA_F (puedes diferenciar)
-rho   = 0.05;
-theta = 0.02;         % prima por endeudarse informal
-tau_l = 0.15;         % impuesto laboral
-tau_c = 0.15;         % IVA
+RRA   = 3.40;         % RRA_I = RRA_F (Ajustar Relative Riusk Aversion)
+rho   = 0.05;           % Discuount factor
+theta = 0.02;         % prima por endeudarse (informal)
+tau_l = 0.15;         % impuesto laboral (Income tax)
+tau_c = 0.18;         % VAT Tax (Consumption Tax)
 Gov   = 0.05;         % bien público (flujo aditivo en utilidad)
-phi   = 0.10;         % transferencias a informales (proporcionales a z1)
+phi   = 0.09;         % transferencias a informales (proporcionales a z1)
 z1    = 0.33;         % ingreso informal
 z2    = 1.00;         % ingreso formal
 
-eta_target = 0.54;    % estacionaria objetivo de informalidad
-p22_bar    = 0.8155;  % persistencia formal (mapea a lambda_2)
+eta_target = 0.654;    % Nivel de informalidad
+p22_bar    = 0.8155;  % persistencia formal (lambda_2)
 Igrid = 700;
 amax  = 5.0;
-amin  = -0.30*z1;     % LIMITE INFERIOR (verifica que no "ahogue" el consumo)
+amin  = -0.30*z1;     % LIMITE INFERIOR ()
 
 % bracket y guess para r
 r_guess = 0.03; rmin = 0.005; rmax = 0.08;
@@ -32,10 +32,10 @@ paramsBase = struct('RRA_I',RRA,'RRA_F',RRA,'rho',rho,'theta',theta, ...
     'r_guess',r_guess,'rmin',rmin,'rmax',rmax, ...
     'p22_bar',p22_bar,'eta_target',eta_target);
 
-%% ===== 2) RESOLVER ECONOMÍA BASE =====
+%% ===== 2) Solve Modelo Base =====
 base = huggett_base_covid_function(paramsBase);
 
-% Alias cortos
+% Etiquetas 
 a   = base.a;     g  = base.g;     c  = base.c;     s = base.s;
 popI = base.popI; popF = base.popF;
 Y    = base.Y;    Ctot= base.Ctot; r  = base.r;
@@ -48,7 +48,7 @@ fprintf('popI/popF = %.4f / %.4f (eta=%.4f)\n', popI, popF, popI/(popI+popF));
 fprintf('Y         = %.6f,   Ctot = %.6f\n', Y, Ctot);
 fprintf('PB        = %.6f,   rB   = %.6f,   BB = %.6f (≈0 en estacionario)\n', fb.PB, fb.rB, fb.BB);
 
-%% ===== 3) EXPORTAR CSVs =====
+%% ===== 3) EXPORTAR CSV =====
 % 3.1 Cuentas fiscales (desagregado ingresos/gastos)
 T_fiscal = table;
 T_fiscal.scenario = "BASE";
@@ -65,12 +65,12 @@ T_fiscal.PB = fb.PB;                 % saldo primario
 T_fiscal.B  = fb.B;                  % stock de deuda
 T_fiscal.BB = fb.BB;                 % balance global (≈0)
 
-writetable(T_fiscal, 'base_fiscal_breakdown.csv');
+writetable(T_fiscal, './tables/base_fiscal_breakdown.csv');
 
 % 3.2 Mercado de activos (demanda privada vs oferta pública)
 A_priv = sum( (g(:,1)+g(:,2)).*a ) * (a(2)-a(1));  % ∫ a(g1+g2) da
 T_assets = table("BASE", A_priv, fb.B, 'VariableNames', {'scenario','A_private','B_public'});
-writetable(T_assets, 'base_asset_market.csv');
+writetable(T_assets, './tables/base_asset_market.csv');
 
 % 3.3 Estadísticas de hogar (del struct .stats)
 S = base.stats;
@@ -93,7 +93,7 @@ T_stats.cons_med_I  = S.cons_median(1);
 T_stats.cons_med_F  = S.cons_median(2);
 T_stats.cons_med_T  = S.cons_median(3);
 T_stats.p11_rep     = S.p11;  % proxy de persistencia informal
-writetable(T_stats, 'base_household_stats.csv');
+writetable(T_stats, './tables/base_household_stats.csv');
 
 % 3.4 Prestatarios / prestamistas
 Borr = base.borrowers;
@@ -107,7 +107,7 @@ T_borr.volBorrow_I  = Borr.volBorrow(1);  % <0
 T_borr.volBorrow_F  = Borr.volBorrow(2);
 T_borr.volLend_I    = Borr.volLend(1);    % >0
 T_borr.volLend_F    = Borr.volLend(2);
-writetable(T_borr, 'base_borrowers_lenders.csv');
+writetable(T_borr, './tables/base_borrowers_lenders.csv');
 
 disp('Exportados: base_fiscal_breakdown.csv, base_asset_market.csv, base_household_stats.csv, base_borrowers_lenders.csv');
 
