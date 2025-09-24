@@ -15,6 +15,7 @@ base.rho   = 0.05; base.theta = 0.02;
 base.tau_l = 0.15; base.tau_c = 0.18; base.Gov = 0.05; base.phi = 0.09;
 base.z1    = 0.33; base.z2    = 1.00;
 base.p22_bar = 0.8155;            % formal persistence
+%base.p22_bar = 0.8155;            % formal persistence
 base.I = 700; base.amax = 5.0; base.amin = -0.30*base.z1;
 base.r_guess = 0.03; base.rmin = 0.005; base.rmax = 0.08;
 base.maxit_V = 100; base.crit_V = 1e-6; base.Delta = 1000;
@@ -95,6 +96,9 @@ bar(M); grid on; ylabel('Assets level');
 set(gca,'XTickLabel',{'Private demand','Public supply B(r)'});
 legend({labL, labH},'Location','best');
 export_fig(fig, fullfile(outdir_figs,'compare_eta_asset_market'));
+
+
+
 
 % ---------- 7) Fiscal accounts ----------
 fig = figure('Name','Fiscal accounts vs informality');
@@ -184,6 +188,85 @@ if DO_S_CURVE
     export_fig(fig, fullfile(outdir_figs,'compare_eta_excess_supply_curve'));
 end
 
+%% ---------- 12) Bond demand vs supply curves (by r) ----------
+% Map r -> {A_priv(r), B(r)=PB(r)/r} para cada eta y marca el equilibrio.
+
+% rangos alrededor de cada equilibrio
+rgridL = linspace(max(1e-3, L.r*0.5), L.r*1.8, 41);
+rgridH = linspace(max(1e-3, H.r*0.5), H.r*1.8, 41);
+
+% curvas usando el helper (definido al final del archivo)
+[~, A_L, B_L] = bond_curves_by_r(cfgL, rgridL(1), rgridL(end), numel(rgridL));
+[~, A_H, B_H] = bond_curves_by_r(cfgH, rgridH(1), rgridH(end), numel(rgridH));
+
+% gráfico (dos paneles)
+fig = figure('Name','Bond demand vs supply (by interest rate)');
+tiledlayout(1,2);
+
+% LOW informality
+nexttile; 
+plot(rgridL, A_L, 'LineWidth',2); hold on;
+plot(rgridL, B_L, 'LineWidth',2);
+xline(L.r, 'k--'); yline(L.fiscal.B, 'k:');
+scatter(L.r, L.fiscal.B, 40, 'k', 'filled');
+grid on; xlabel('Interest rate r'); ylabel('Assets / Debt level');
+title(sprintf('Low informality (eta=%.2f)', eta_low));
+legend({'Private demand A_{priv}(r)', 'Public supply B(r)=PB(r)/r', 'r^*','B^*','Equilibrium'}, 'Location','best');
+
+% HIGH informality
+nexttile; 
+plot(rgridH, A_H, 'LineWidth',2); hold on;
+plot(rgridH, B_H, 'LineWidth',2);
+xline(H.r, 'k--'); yline(H.fiscal.B, 'k:');
+scatter(H.r, H.fiscal.B, 40, 'k', 'filled');
+grid on; xlabel('Interest rate r'); ylabel('Assets / Debt level');
+title(sprintf('High informality (eta=%.2f)', eta_high));
+legend({'Private demand A_{priv}(r)', 'Public supply B(r)=PB(r)/r', 'r^*','B^*','Equilibrium'}, 'Location','best');
+
+export_fig(fig, fullfile(outdir_figs,'compare_eta_bond_demand_supply'));
+
+
+%% ---------- 12b) Bond demand by type vs public supply ----------
+% For each eta scenario, plot A_I(r), A_F(r) and B(r)=PB(r)/r and mark equilibrium.
+
+% r grids (reuse the ones you like; here a bit wider around each r*)
+rgridL = linspace(max(1e-3, L.r*0.6), L.r*1.6, 41);
+rgridH = linspace(max(1e-3, H.r*0.6), H.r*1.6, 41);
+
+% compute curves (helper at the end of file)
+[~, A1_L, A2_L, B_L] = bond_curves_by_r_types(cfgL, rgridL(1), rgridL(end), numel(rgridL));
+[~, A1_H, A2_H, B_H] = bond_curves_by_r_types(cfgH, rgridH(1), rgridH(end), numel(rgridH));
+
+% PLOT: two panels (low/high informality)
+fig = figure('Name','Bond demand by type vs public supply (by r)');
+tiledlayout(1,2);
+
+% LOW informality
+nexttile;
+plot(rgridL, A1_L, 'LineWidth',2); hold on;                 % Informal demand
+plot(rgridL, A2_L, 'LineWidth',2);                          % Formal demand
+plot(rgridL, B_L,  'LineWidth',2);                          % Public supply
+xline(L.r, 'k--'); yline(L.fiscal.B, 'k:');
+scatter(L.r, L.fiscal.B, 40, 'k', 'filled');
+grid on; xlabel('Interest rate r'); ylabel('Assets / Debt level');
+title(sprintf('Low informality (eta=%.2f)', eta_low));
+legend({'A_I(r)','A_F(r)','B(r)=PB(r)/r','r^*','B^*','Equilibrium'}, 'Location','best');
+
+% HIGH informality
+nexttile;
+plot(rgridH, A1_H, 'LineWidth',2); hold on;                 % Informal demand
+plot(rgridH, A2_H, 'LineWidth',2);                          % Formal demand
+plot(rgridH, B_H,  'LineWidth',2);                          % Public supply
+xline(H.r, 'k--'); yline(H.fiscal.B, 'k:');
+scatter(H.r, H.fiscal.B, 40, 'k', 'filled');
+grid on; xlabel('Interest rate r'); ylabel('Assets / Debt level');
+title(sprintf('High informality (eta=%.2f)', eta_high));
+legend({'A_I(r)','A_F(r)','B(r)=PB(r)/r','r^*','B^*','Equilibrium'}, 'Location','best');
+
+export_fig(fig, fullfile(outdir_figs,'compare_eta_bond_demand_by_type'));
+
+
+
 fprintf('All comparative figures saved to %s\n', outdir_figs);
 
 % ---------- Helpers (style/export/lorenz) ----------
@@ -213,4 +296,46 @@ function [vals, L, cumPop] = lorenz_from_values(a, g, x)
     da = a(2)-a(1); w = (g(:,1)+g(:,2))*da; W = sum(w);
     vals = x(:); [vals_s, ix] = sort(vals); w_s = w(ix); cumPop = cumsum(w_s)/W;
     cumx = cumsum(vals_s .* w_s); L = cumx / max(cumx(end),1e-12);
+end
+
+
+
+
+function [rgrid, Agrid, Bgrid] = bond_curves_by_r(cfg, r_lo, r_hi, n)
+    rgrid = linspace(r_lo, r_hi, n);
+    Agrid = nan(size(rgrid)); Bgrid = nan(size(rgrid));
+    alt = cfg; alt.maxit_r = 1; alt.fix_r = 1;
+    for i = 1:numel(rgrid)
+        alt.r_guess = rgrid(i); alt.rmin = alt.r_guess; alt.rmax = alt.r_guess;
+        sol = solve_two_type_huggett_fiscal(alt);
+        a = sol.a; da = a(2)-a(1);
+        Agrid(i) = sum((sol.g(:,1)+sol.g(:,2)).*a)*da;
+        PB = sol.fiscal.PB; Bgrid(i) = PB / max(rgrid(i),1e-12);
+    end
+end
+
+
+function [rgrid, A1grid, A2grid, Bgrid] = bond_curves_by_r_types(cfg, r_lo, r_hi, n)
+    % Returns r -> {A_I(r), A_F(r), B(r)=PB(r)/r} for a given eta (cfg).
+    rgrid  = linspace(r_lo, r_hi, n);
+    A1grid = nan(size(rgrid));
+    A2grid = nan(size(rgrid));
+    Bgrid  = nan(size(rgrid));
+
+    alt = cfg; alt.maxit_r = 1; alt.fix_r = 1;  % solve once per r (no bisection)
+    for i = 1:numel(rgrid)
+        alt.r_guess = rgrid(i);
+        alt.rmin = alt.r_guess; alt.rmax = alt.r_guess;
+
+        sol = solve_two_type_huggett_fiscal(alt);
+        a  = sol.a; da = a(2)-a(1);
+
+        % Per-type net asset demand
+        A1grid(i) = sum(sol.g(:,1).*a)*da;   % informal
+        A2grid(i) = sum(sol.g(:,2).*a)*da;   % formal
+
+        % Public supply from fiscal closure
+        PB = sol.fiscal.PB;
+        Bgrid(i) = PB / max(rgrid(i), 1e-12);
+    end
 end
