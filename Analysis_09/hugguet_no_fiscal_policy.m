@@ -1,53 +1,34 @@
-function out = huggett_base_covid_function(params)
+function out = hugguet_no_fiscal_policy(params)
 % -------------------------------------------------------------------------
-% Modelo Huggett con 2 tipos (Informal/Formal) + impuestos y transferencias
-% - tau_l: impuesto laboral (solo formales)
-% - tau_c: IVA (ambos)
-% - phi:   transferencias a informales (phi * z1, por persona informal)
-% - Gov:   bien público (aditivo en utilidad), provisto siempre
-% - theta: prima de endeudamiento informal (tasa r+theta si a<0)
-% - B(r) endógena cierra el presupuesto: B = (Tl + Tc - G - Tr)/r
-% - Transiciones ocupacionales:
-%     * Por defecto (sin params.lambdaSpec): λ2 constante a partir de p22,
-%       y λ1 = ((1-eta_target)/eta_target) * λ2  (replica tu legacy).
-%     * Con params.lambdaSpec.mode='custom': usa la1_fun(a,eta), la2_fun(a,eta).
+% Modelo Huggett con 2 tipos (Informal/Formal) SIN política fiscal:
+%  - tau_l = 0, tau_c = 0, phi = 0, Gov = 0, B(r) = 0
+%  - r se determina cerrando el mercado de activos PRIVADO: ∫a g(a) da = 0
+%  - Informal paga prima θ cuando a<0
+%  - Transiciones ocupacionales: "legacy" con p22 dado y eta_target
 %
-% ENTRADA: struct params con (valores por defecto entre []):
-%   RRA_I [4.2], RRA_F [4.2], rho [0.05], theta [0.02]
-%   tau_l [0.15], tau_c [0.10], phi [0.15], Gov [0.07]
-%   z1 [0.33], z2 [1.0]
-%   I [700], amin [-0.30*z1], amax [5], r_guess [0.03], rmin [0.005], rmax [0.08]
-%   p22_bar [0.8155], eta_target [0.64]
-%   lambdaSpec (opcional): struct con .mode='custom', .la1_fun, .la2_fun
-%
-% SALIDA: struct out con campos:
-%   r, a, g (I x 2), c (I x 2), s (I x 2), popI, popF, Ctot, Y
-%   fiscal: Tl, Tc, Tr, G, PB, B, rB, BB
-%   stats: wealth/cons (medias, medianas, Gini por tipo y total)
-%   borrowers: fracciones y montos (por tipo) para a<0 y a>0
+% ENTRADA (params): RRA_I,RRA_F,rho,theta,z1,z2,I,amin,amax,
+%                   r_guess,rmin,rmax,p22_bar,eta_target (mismos nombres que tu base)
+% SALIDA (out): estructura compatible con tu main "base", pero con fiscal=0
 % -------------------------------------------------------------------------
 
 %% ----- Lectura de parámetros y defaults
 arg = @(f,def) (isfield(params,f) && ~isempty(params.(f))) * params.(f) + ...
                ~(isfield(params,f) && ~isempty(params.(f))) * def;
 
-sI    = arg('RRA_I', 3.40);%4.2);
-sF    = arg('RRA_F', 3.40);%4.2);
+sI    = arg('RRA_I', 3.40);
+sF    = arg('RRA_F', 3.40);
 rho   = arg('rho',   0.05);
 theta = arg('theta', 0.02);
 
-tau_l = arg('tau_l', 0.15);
-tau_c = arg('tau_c', 0.18);
-phi   = arg('phi',   0.09);
-Gov   = arg('Gov',   0.05);
+% sin política fiscal
+tau_l = 0; tau_c = 0; phi = 0; Gov = 0;
 
 z1    = arg('z1',    0.33);
 z2    = arg('z2',    1.00);
 z     = [z1, z2];
 
 I     = arg('I',     700);
-amin  = arg('amin', -0.50*z1);
-%amin  = arg('amin', -0.30*z1);
+amin  = arg('amin', -0.30*z1);
 amax  = arg('amax',  5.0);
 a     = linspace(amin, amax, I)'; 
 da    = (amax-amin)/(I-1);
@@ -72,7 +53,7 @@ end
 maxit = 100; crit = 1e-6; Delta = 1000;
 Ir    = 1000; crit_S = 1e-5;
 
-% Lambda inicial
+% Lambda inicial (legacy o custom)
 if useCustomLambda
     L1_vec = max(la1_fun(a, eta_target), 1e-10);
     L2_vec = max(la2_fun(a, eta_target), 1e-10);
@@ -88,10 +69,10 @@ end
 Aswitch = [ -spdiags(L1_vec,0,I,I),  spdiags(L1_vec,0,I,I);
              spdiags(L2_vec,0,I,I), -spdiags(L2_vec,0,I,I) ];
 
-% Valor inicial (simple y estable)
+% Valor inicial simple
 rr = r*ones(I,1); rr(a<0) = r + theta;
-v0(:,1) = ((((1-0)*zz(:,1) + rr.*a + phi*z1)/(1+tau_c)).^(1-sI)/(1-sI) + Gov)/rho;
-v0(:,2) = ((((1-tau_l)*zz(:,2) + r .*a          )/(1+tau_c)).^(1-sF)/(1-sF) + Gov)/rho;
+v0(:,1) = ((((1-0)*zz(:,1) + rr.*a )).^(1-sI)/(1-sI) + Gov)/rho;
+v0(:,2) = ((((1-0)*zz(:,2) + r .*a )).^(1-sF)/(1-sF) + Gov)/rho;
 
 for ir = 1:Ir
     v = v0;
@@ -102,32 +83,32 @@ for ir = 1:Ir
         dVf = zeros(I,2); dVb = zeros(I,2);
         dVf(1:I-1,:) = (V(2:I,:) - V(1:I-1,:))/da;
         dVf(I,1) = ((1-0)*z1 + r*amax)^(-sI);
-        dVf(I,2) = ((1-tau_l)*z2 + r*amax)^(-sF);
+        dVf(I,2) = ((1-0)*z2 + r*amax)^(-sF);
 
         dVb(2:I,:) = (V(2:I,:) - V(1:I-1,:))/da;
         dVb(1,1)   = ((1-0)*z1 + (r+theta)*amin)^(-sI);
-        dVb(1,2)   = ((1-tau_l)*z2 + r*amin)^(-sF);
+        dVb(1,2)   = ((1-0)*z2 + r*amin)^(-sF);
 
         % tasas efectivas (informal paga prima si a<0)
         rr = r*ones(I,1); rr(a<0) = r + theta;
 
-        % “recursos” (lado derecho de BC sin consumo)
-        res_inf = (1-0)*zz(:,1) + rr.*aa(:,1) + phi*z1;
-        res_for = (1-tau_l)*zz(:,2) + r .*aa(:,2);
+        % “recursos” (sin impuestos ni transferencias)
+        res_inf = (1-0)*zz(:,1) + rr.*aa(:,1);
+        res_for = (1-0)*zz(:,2) + r .*aa(:,2);
 
-        % consumo con IVA (upwind)
-        cf = [max((1+tau_c)*dVf(:,1),1e-10).^(-1/sI), max((1+tau_c)*dVf(:,2),1e-10).^(-1/sF)];
-        cb = [max((1+tau_c)*dVb(:,1),1e-10).^(-1/sI), max((1+tau_c)*dVb(:,2),1e-10).^(-1/sF)];
-        ssf = [res_inf, res_for] - (1+tau_c)*cf;
-        ssb = [res_inf, res_for] - (1+tau_c)*cb;
+        % consumo (upwind, sin IVA)
+        cf = [max(dVf(:,1),1e-10).^(-1/sI), max(dVf(:,2),1e-10).^(-1/sF)];
+        cb = [max(dVb(:,1),1e-10).^(-1/sI), max(dVb(:,2),1e-10).^(-1/sF)];
+        ssf = [res_inf, res_for] - cf;
+        ssb = [res_inf, res_for] - cb;
         c0  = [res_inf, res_for];
 
         If = ssf>0; Ib = ssb<0; I0 = (1-If-Ib);
-        c  = cf.*If + cb.*Ib + c0.*(I0/(1+tau_c));  % si drift≈0, c = res/(1+tau_c)
+        c  = cf.*If + cb.*Ib + c0.*I0;   % si drift≈0, c = res
 
         u = [c(:,1).^(1-sI)/(1-sI), c(:,2).^(1-sF)/(1-sF)] + Gov.*ones(I,2);
 
-        % generador (suma de filas = 0)
+        % generador (suma filas=0)
         X = max(-ssb,0)/da;  Z = max(ssf,0)/da;
         X(1,:) = 0; Z(I,:) = 0;  Y = -(X+Z);
         A1 = spdiags(Y(:,1),0,I,I)+spdiags(X(2:I,1),-1,I,I)+spdiags([0;Z(1:I-1,1)],1,I,I);
@@ -142,9 +123,7 @@ for ir = 1:Ir
         V_stacked = Bmat \ (u_stacked + V_stacked/Delta);
         V = [V_stacked(1:I), V_stacked(I+1:2*I)];
 
-        if max(max(abs(V - v))) < crit
-            break
-        end
+        if max(max(abs(V - v))) < crit, break; end
         v = V;
     end
 
@@ -157,20 +136,16 @@ for ir = 1:Ir
     g  = g / (sum(g(:))*da);
 
     % políticas de ahorro s(a)
-    s = [res_inf, res_for] - (1+tau_c)*c;
+    s = [res_inf, res_for] - c;
 
-    % ---- Gobierno: cuentas y deuda B(r)
+    % ---- Mercado de activos (solo privado)
     popI = sum(g(:,1))*da; popF = sum(g(:,2))*da;
     Ctot = sum(c(:,1).*g(:,1))*da + sum(c(:,2).*g(:,2))*da;
-    Tl   = tau_l * z2 * popF;
-    Tc   = tau_c * Ctot;
-    Tr   = phi   * z1 * popI;
-    Gx   = Gov * (popI + popF);
 
-    Btarget = (Tl + Tc - (Gx + Tr)) / max(r,1e-9);
-    S = g(:,1)'*a*da + g(:,2)'*a*da - Btarget;
+    % B(public) = 0  =>   S = ∫ a g(a) da
+    S = g(:,1)'*a*da + g(:,2)'*a*da;
 
-    % Si λ depende de composición, actualiza y repite bisección
+    % si λ depende de composición, actualiza
     if useCustomLambda
         L1_vec = max(la1_fun(a, popI), 1e-10);
         L2_vec = max(la2_fun(a, popI), 1e-10);
@@ -186,31 +161,25 @@ for ir = 1:Ir
         break
     end
 
-    % actualiza valor inicial para próxima iteración de r
+    % actualizar v0 para nueva r
     rr = r*ones(I,1); rr(a<0) = r + theta;
-    v0(:,1) = ((((1-0)*zz(:,1) + rr.*a + phi*z1)/(1+tau_c)).^(1-sI)/(1-sI) + Gov)/rho;
-    v0(:,2) = ((((1-tau_l)*zz(:,2) + r .*a          )/(1+tau_c)).^(1-sF)/(1-sF) + Gov)/rho;
+    v0(:,1) = ((((1-0)*zz(:,1) + rr.*a )).^(1-sI)/(1-sI) + Gov)/rho;
+    v0(:,2) = ((((1-0)*zz(:,2) + r .*a )).^(1-sF)/(1-sF) + Gov)/rho;
 end
 
-% ---- Resultados fiscales finales
-rB = r * Btarget;
-PB = Tl + Tc - (Gx + Tr);
-BB = PB - rB;
+%% ---- Resultados "fiscales" nulos y agregados
+Tl=0; Tc=0; Tr=0; Gx=0; Btarget=0; rB=0; PB=0; BB=0;
 Y  = z1*popI + z2*popF;
 
-% ---- Estadísticas de riqueza y consumo
-% riqueza
-wI_mean = wmean(a, g(:,1), da);
-wF_mean = wmean(a, g(:,2), da);
+% Estadísticas
+wI_mean = wmean(a, g(:,1), da);  wF_mean = wmean(a, g(:,2), da);
 wT_mean = wmean(a, g(:,1)+g(:,2), da);
-wI_med  = wmedian(a, g(:,1), da);
-wF_med  = wmedian(a, g(:,2), da);
+wI_med  = wmedian(a, g(:,1), da); wF_med  = wmedian(a, g(:,2), da);
 wT_med  = wmedian(a, g(:,1)+g(:,2), da);
 gini_I  = giniW(a, g(:,1), da);
 gini_F  = giniW(a, g(:,2), da);
 gini_T  = giniW(a, g(:,1)+g(:,2), da);
 
-% consumo
 cI_mean = wmean(c(:,1), g(:,1), da);
 cF_mean = wmean(c(:,2), g(:,2), da);
 cT_mean = wmean(c(:,1)+c(:,2), g(:,1)+g(:,2), da);
@@ -218,29 +187,19 @@ cI_med  = wmedian(c(:,1), g(:,1), da);
 cF_med  = wmedian(c(:,2), g(:,2), da);
 cT_med  = wmedian([c(:,1); c(:,2)], [g(:,1); g(:,2)], da);
 
-% ---- Prestatarios / prestamistas
-idxB = (a<0); idxL = (a>0);
-massI = popI; massF = popF;
+idxB = (a<0); idxL=(a>0); massI=popI; massF=popF;
 fracBorrow_I = sum(g(idxB,1))*da / max(massI,1e-12);
 fracBorrow_F = sum(g(idxB,2))*da / max(massF,1e-12);
 fracLend_I   = sum(g(idxL,1))*da / max(massI,1e-12);
 fracLend_F   = sum(g(idxL,2))*da / max(massF,1e-12);
-
-volBorrow_I  = sum(g(idxB,1).*a(idxB))*da;   % < 0
-volBorrow_F  = sum(g(idxB,2).*a(idxB))*da;   % < 0
-volLend_I    = sum(g(idxL,1).*a(idxL))*da;   % > 0
-volLend_F    = sum(g(idxL,2).*a(idxL))*da;   % > 0
+volBorrow_I  = sum(g(idxB,1).*a(idxB))*da;   % <0
+volBorrow_F  = sum(g(idxB,2).*a(idxB))*da;   % <0
+volLend_I    = sum(g(idxL,1).*a(idxL))*da;   % >0
+volLend_F    = sum(g(idxL,2).*a(idxL))*da;   % >0
 
 % ---- Empaquetar salida
-out.r   = r;
-out.a   = a;
-out.g   = g;
-out.c   = c;
-out.s   = s;
-out.popI = popI;
-out.popF = popF;
-out.Ctot = Ctot;
-out.Y    = Y;
+out.r   = r;     out.a   = a;     out.g = g;  out.c = c;  out.s = s;
+out.popI = popI; out.popF = popF; out.Ctot = Ctot; out.Y = Y;
 
 out.fiscal = struct('Tl',Tl,'Tc',Tc,'Tr',Tr,'G',Gx,'B',Btarget,'rB',rB,'PB',PB,'BB',BB);
 
@@ -262,7 +221,7 @@ out.borrowers = struct( ...
 
 end
 
-% ======================== Helpers (ponderados) ===========================
+% ======================== Helpers ===========================
 function m = wmean(x,w,da)
 x=x(:); w=w(:); if nargin<3, da=1; end
 W = sum(w)*da; if W<=0, m=NaN; else, m = sum(x.*w)*da / W; end
@@ -278,8 +237,9 @@ end
 function gini = giniW(x,w,da)
 x=x(:); w=w(:); if nargin<3, da=1; end
 W = sum(w)*da; if W<=0, gini=NaN; return; end
-xmin = min(0,min(x)); xs = x - xmin + 1e-12;    % desplaza a>0
+xmin = min(0,min(x)); xs = x - xmin + 1e-12;
 [xx,ix]=sort(xs); ww=w(ix)*da;
-cumw = cumsum(ww)/W; cumxw = cumsum(xx.*ww); if cumxw(end)<=0, gini=NaN; return; end
+cumw = cumsum(ww)/W; cumxw = cumsum(xx.*ww);
+if cumxw(end)<=0, gini=NaN; return; end
 L = cumxw/cumxw(end); gini = 1 - 2*trapz(cumw,L);
 end
