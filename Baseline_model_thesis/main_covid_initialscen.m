@@ -26,8 +26,8 @@ base.maxit_r = 1000; base.crit_S = 1e-5; base.fix_r = 0;
 base.eta_target = 0.654;
 
 % ---------- 2) Shock COVID en ingresos (ASIMÉTRICO) ----------
-y_shock_I = 0.65;   % Informales caen 35%
-y_shock_F = 0.75;   % Formales caen 25%
+y_shock_I = 0.75;   % Informales caen 35%
+y_shock_F = 0.85;   % Formales caen 25%
 z1_covid  = base.z1 * y_shock_I;
 z2_covid  = base.z2 * y_shock_F;
 
