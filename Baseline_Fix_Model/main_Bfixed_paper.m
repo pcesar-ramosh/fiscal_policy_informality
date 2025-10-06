@@ -25,7 +25,7 @@ cfg.sigma_a = 0.010;       % suaviza FP
 cfg.psi_G   = 0.30;        % G multiplicativo (intensidad)
 cfg.omegaG  = 1.0;
 cfg.B_mode  = 'ratio_to_Y';
-cfg.Bbar    = 0.35;        % Perú-like deuda/PIB
+cfg.Bbar    = 0.45;        % Perú-like deuda/PIB
 cfg.alphaG  = 0.50; cfg.clamp_G_to_zero = true;
 cfg.G_cap_ratio = 0.08;    % CAP opcional para que G no sea descomunal
 
