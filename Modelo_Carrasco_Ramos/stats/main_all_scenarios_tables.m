@@ -74,14 +74,14 @@ fprintf('Pre-pase Bbar: Apriv(rmin)=%.4f, Apriv(rmax)=%.4f => Bbar=%.4f\n', Apri
 
 % ============================ Definir escenarios ==========================
 % Ajustes (puedes cambiarlos fácilmente)
-d_tau_c     = +0.03;     % i) aumento IVA
-d_tau_l     = +0.03;     % ii) aumento impuesto laboral
+d_tau_c     = +0.05;     % i) aumento IVA
+d_tau_l     = +0.05;     % ii) aumento impuesto laboral
 phi_up_pct  = +0.15;     % iii) +15% transferencias (factor 1.15)
 z1_drop     = 0.80;      % iv-v) caída 20% informal
 z2_drop     = 0.90;      % iv-v) caída 10% formal
 eta_high    = 0.75;      % vii) mayor informalidad
 eta_low     = 0.45;      % viii) menor informalidad
-d_theta_I   = +0.03;     % x) costo endeudamiento (informal)
+d_theta_I   = +0.04;     % x) costo endeudamiento (informal)
 d_theta_F   = +0.02;     % x) costo endeudamiento (formal)
 
 SC = {}; k = 0;

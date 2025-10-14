@@ -42,8 +42,13 @@ cfg.report_G_effects = 1;
 cfg.sigma_a = 0.010;
 
 % ---- Gobierno / deuda: B = Bbar * Y  ----
-cfg.B_mode = 'ratio_to_Y';   % deuda como % del PIB
-cfg.Bbar   = 0.35;           % objetivo B/Y
+cfg.B_mode   = 'ratio_to_Y';   % deuda como % del PIB
+cfg.Bbar     = 0.35;           % objetivo B/Y
+cfg.gov_mode = 'close_by_G';   % CIERRE por G (incluye rB), BB=0  (lo que pide Ian)
+% (opcional para test de tiempo)
+% cfg.gov_mode = 'fixed_G'; cfg.G_fixed = 0.0;
+
+paper_style();
 
 % ------------------ Resolver ------------------
 sol = solve_two_type_huggett_fiscal_Bfixed(cfg);
@@ -56,6 +61,12 @@ fprintf('popI=%.4f  popF=%.4f  (eta=%.3f)\n', sol.popI, sol.popF, sol.popI/(sol.
 fprintf('Y=%.6f  Ctot=%.6f  Gpc=%.6f\n', sol.Y, sol.Ctot, sol.Gpc);
 fprintf('Tl=%.6f  Tc=%.6f  Tr=%.6f  G=%.6f  rB=%.6f\n', fb.Tl, fb.Tc, fb.Tr, fb.G, fb.rB);
 fprintf('PB=%.6e  BB=%.6e  (BB debe ser 0)\n', fb.PB, fb.BB);
+if isfield(sol,'G_effects') && ~isempty(sol.G_effects)
+    ge = sol.G_effects;
+    fprintf('[G effects] u_mult=(1+psi*Gpc)^omega=%.3f | MU_I=%.3f MU_F=%.3f\n', ...
+        ge.u_mult, ge.mu_mult_I, ge.mu_mult_F);
+end
+fprintf('||HJB residual||_∞ ≈ %.3e\n', sol.hjb_residual);
 
 % ------------------ CSVs ----------------------
 da = sol.a(2)-sol.a(1);
@@ -95,8 +106,6 @@ writetable(T_borr, fullfile(outdir_tabs,'borrowers_lenders.csv'));
 fprintf('CSV exportados en %s\n', outdir_tabs);
 
 % ------------------ GRÁFICOS ------------------
-paper_style();
-
 % 1) Políticas: Consumo c(a)
 fig=figure('Name','Policy: Consumption');
 plot(sol.a,sol.c(:,1),'LineWidth',2); hold on; plot(sol.a,sol.c(:,2),'LineWidth',2);

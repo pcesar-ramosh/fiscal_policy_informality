@@ -2,13 +2,14 @@ function out = solve_two_type_huggett_fiscal_Bfixed(cfg)
 % -------------------------------------------------------------------------
 % Dos tipos (informal/formal) estilo Huggett con:
 %   - Cierre financiero por bisección en r:  A_priv(r) = B
-%   - Deuda pública como % del PIB:          B = Bbar * Y   (o 'level')
-%   - Cierre fiscal EXACTO:                  G = Tl + Tc - Tr - rB  => BB = 0
-%   - Bien público multiplicativo en utilidad y en MU
+%   - Deuda pública:  B = Bbar * Y  (B_mode='ratio_to_Y') o nivel ('level')
+%   - Cierre fiscal EXACTO por G:     G = Tl + Tc - Tr - rB  => BB = 0
+%   - Bien público multiplicativo en utilidad y MU (vía Gpc)
 %   - Punto fijo externo en Gpc para coherencia FOC-cuentas
+%   - Bracketing robusto de S(r) y fallback al borde si no hay cambio de signo
 % -------------------------------------------------------------------------
 
-% ======= Lectura segura de parámetros =======
+% ======= Lectura de parámetros =======
 arg   = @(f,def) get_arg(cfg,f,def);
 sI    = arg('RRA_I',3.40);   sF    = arg('RRA_F',3.40);   rho   = arg('rho',0.08);
 tau_l = arg('tau_l',0.15);   tau_c = arg('tau_c',0.18);   phi   = arg('phi',0.09);
@@ -37,131 +38,163 @@ maxit_V = arg('maxit_V',160);  crit_V = arg('crit_V',1e-6);  Delta = arg('Delta'
 
 B_mode  = arg('B_mode','ratio_to_Y');   % 'ratio_to_Y' | 'level'
 Bbar    = arg('Bbar',0.35);
+gov_mode= arg('gov_mode','close_by_G'); % 'close_by_G' (recomendado) | 'fixed_G'
+G_fixed = arg('G_fixed',0.0);           % usado solo si gov_mode='fixed_G'
 
-% ======= Inicialización =======
-r        = r_guess;
-r_path   = []; S_path = [];
-Ir       = maxit_r; if fix_r, Ir=1; rmin=r; rmax=r; end
-
-% ======= Búsqueda en r =======
-for it_r = 1:Ir
-    % ----- Punto fijo externo en Gpc -----
-    Gpc = 0;  % arranque
-    for itG = 1:10
-        % ---------- HJB dado Gpc ----------
-        [V, c, A, rr1, rr2, facI, facF] = solve_HJB_given_Gpc(r, a, da, ...
-            sI,sF,rho, z1,z2, tau_l,tau_c, phi, theta_I,theta_F, ...
-            psi_G,omegaG, Gpc, sigma_a,nu, Aswitch, maxit_V,crit_V,Delta);
-
-        % ---------- FP implícito iterado ----------
-        g = solve_FP(A, I, da);
-
-        % ---------- Agregados (dado Gpc) ----------
-        popI = sum(g(:,1))*da;  popF = sum(g(:,2))*da;  massT = popI + popF;
-        Ctot = sum(c(:,1).*g(:,1))*da + sum(c(:,2).*g(:,2))*da;
-        Y    = z1*popI + z2*popF;
-
-        % ---------- Cuentas fiscales y G residual (BB=0) ----------
-        if strcmpi(B_mode,'ratio_to_Y'), B = Bbar*Y; else, B = Bbar; end
-        rB = r*B;
-        Tl = tau_l*z2*popF;
-        Tc = tau_c*Ctot;
-        Tr = phi*z1*popI;
-
-        Gx  = Tl + Tc - Tr - rB;     % => PB = rB,  BB = 0
-        Gpc_new = Gx / max(massT,1e-12);
-
-        % Convergencia en Gpc
-        if abs(Gpc_new - Gpc) < 1e-9, break; end
-        Gpc = 0.6*Gpc + 0.4*Gpc_new;  % relajación estable
-    end
-
-    % ---------- Cierre financiero ----------
-    A_priv = g(:,1)'*a*da + g(:,2)'*a*da;
-    S = A_priv - B;
-
-    r_path = [r_path; r];  S_path = [S_path; S];
-
-    if fix_r
-        break;
-    else
-        if S > +crit_S
-            rmax = r; r = 0.5*(r + rmin);
-        elseif S < -crit_S
-            rmin = r; r = 0.5*(r + rmax);
-        else
-            break;
-        end
-        % reinicia V coherente para el siguiente r (seed simple)
-        V = zeros(I,2);
-    end
-end
-
-% ---------- Políticas de ahorro (post-solve) ----------
-s_pol = [ z1 + rr1.*a + phi*z1 - (1+tau_c)*c(:,1), ...
-          (1-tau_l)*z2 + rr2.*a - (1+tau_c)*c(:,2) ];
-
-% ---------- Estadísticos ----------
-[wI_mean,wF_mean,wT_mean] = deal(wmean(a,g(:,1),da), wmean(a,g(:,2),da), wmean(a,g(:,1)+g(:,2),da));
-[wI_med,wF_med,wT_med]   = deal(wmedian(a,g(:,1),da), wmedian(a,g(:,2),da), wmedian(a,g(:,1)+g(:,2),da));
-[giniW_I,giniW_F,giniW_T]= deal(giniW(a,g(:,1),da), giniW(a,g(:,2),da), giniW(a,g(:,1)+g(:,2),da));
-[cI_mean,cF_mean,cT_mean]= deal(wmean(c(:,1),g(:,1),da), wmean(c(:,2),g(:,2),da), wmean(c(:,1)+c(:,2),g(:,1)+g(:,2),da));
-[cI_med,cF_med,cT_med]   = deal(wmedian(c(:,1),g(:,1),da), wmedian(c(:,2),g(:,2),da), wmedian([c(:,1);c(:,2)],[g(:,1);g(:,2)],da));
-[giniC_I,giniC_F,giniC_T]= deal(giniX(c(:,1),g(:,1),da), giniX(c(:,2),g(:,2),da), giniX([c(:,1);c(:,2)],[g(:,1);g(:,2)],da));
-
-% ---------- Residuo HJB ----------
-u_check = [u_mult(c(:,1),Gpc,sI,psi_G,omegaG), u_mult(c(:,2),Gpc,sF,psi_G,omegaG)];
-R = rho*[V(:,1);V(:,2)] - [u_check(:,1);u_check(:,2)] - A*[V(:,1);V(:,2)];
-hjb_res = max(abs(R));
-
-% ---------- Deudores / Ahorradores ----------
-idxB=(a<0); idxL=(a>0);
-fracBorrow_I=sum(g(idxB,1))*da / max(sum(g(:,1))*da,1e-12);
-fracBorrow_F=sum(g(idxB,2))*da / max(sum(g(:,2))*da,1e-12);
-fracLend_I  =sum(g(idxL,1))*da / max(sum(g(:,1))*da,1e-12);
-fracLend_F  =sum(g(idxL,2))*da / max(sum(g(:,2))*da,1e-12);
-volBorrow_I =sum(g(idxB,1).*a(idxB))*da;
-volBorrow_F =sum(g(idxB,2).*a(idxB))*da;
-volLend_I   =sum(g(idxL,1).*a(idxL))*da;
-volLend_F   =sum(g(idxL,2).*a(idxL))*da;
-
-% ---------- Output ----------
-PB = rB;      % por construcción
-BB = 0.0;     % por construcción
-
-out.r = r; out.a = a; out.g = g; out.c = c; out.s = s_pol;
-out.popI = popI; out.popF = popF; out.Ctot = Ctot; out.Y = Y;
-out.S_residual = S; out.hjb_residual = hjb_res; out.Gpc = Gpc;
-
-out.fiscal = struct('Tl',Tl,'Tc',Tc,'Tr',Tr,'G',Gx,'B',B,'rB',rB,'PB',PB,'BB',BB, ...
-                    'B_over_Y', Bbar);
-
-out.stats = struct('wealth_mean',[wI_mean wF_mean wT_mean], ...
-                   'wealth_median',[wI_med wF_med wT_med], ...
-                   'giniW',[giniW_I giniW_F giniW_T], ...
-                   'cons_mean',[cI_mean cF_mean cT_mean], ...
-                   'cons_median',[cI_med cF_med cT_med], ...
-                   'giniC',[giniC_I giniC_F giniC_T], 'p11',p11_rep);
-
-out.borrowers = struct('fracBorrow',[fracBorrow_I fracBorrow_F], ...
-                       'fracLend',[fracLend_I fracLend_F], ...
-                       'volBorrow',[volBorrow_I volBorrow_F], ...
-                       'volLend',[volLend_I volLend_F]);
-
-if report_G
-    mu_mult_I = (1+psi_G*Gpc)^(omegaG*(1-sI));
-    mu_mult_F = (1+psi_G*Gpc)^(omegaG*(1-sF));
-    u_mult_fac= (1+psi_G*Gpc)^(omegaG);
-    out.G_effects = struct('mu_mult_I',mu_mult_I,'mu_mult_F',mu_mult_F,'u_mult',u_mult_fac,'Gpc',Gpc);
+% ======= Resolución en r (con bracketing robusto) =======
+if fix_r
+    out = solve_given_r(r_guess); 
+    return;
 else
-    out.G_effects = struct();
+    % evaluar S(rmin), S(rmax); expandir si no hay cambio de signo
+    [Smin, ~] = eval_S(rmin);
+    [Smax, ~] = eval_S(rmax);
+    it_expand = 0;
+    while Smin*Smax > 0 && it_expand < 6
+        rmin = max(1e-4, 0.7*rmin);
+        rmax = 1.4*rmax;
+        [Smin, ~] = eval_S(rmin);
+        [Smax, ~] = eval_S(rmax);
+        it_expand = it_expand + 1;
+    end
+    if Smin*Smax > 0
+        % no hubo cambio de signo; devolvemos el borde "menos malo"
+        if abs(Smin) < abs(Smax), out = solve_given_r(rmin); else, out = solve_given_r(rmax); end
+        warning('Bisection: no sign change; returning boundary solution.');
+        return;
+    end
+
+    r_low = rmin; S_low = Smin;
+    r_high= rmax; S_high= Smax;
+    best = []; r_mid = r_guess;
+
+    for it=1:maxit_r
+        r_mid = 0.5*(r_low + r_high);
+        [S_mid, sol_mid] = eval_S(r_mid);
+        if isempty(best) || abs(S_mid) < abs(best.S_residual), best = sol_mid; end
+        if abs(S_mid) < crit_S, break; end
+        if S_low * S_mid <= 0
+            r_high = r_mid; S_high = S_mid;
+        else
+            r_low = r_mid;  S_low  = S_mid;
+        end
+    end
+    out = best; 
+    return;
 end
 
-out.params.public_good = struct('psi_G',psi_G,'omegaG',omegaG);
-out.r_path = r_path; out.S_path = S_path;
+% =================== subfunciones (nivel 1) ===================
+    function [Sval, solr] = eval_S(rr)
+        solr = solve_given_r(rr);
+        Sval = solr.S_residual;
+    end
 
-% ================== Subfunciones anidadas ==================
-    function [V, c, A, rr1, rr2, facI, facF] = solve_HJB_given_Gpc(r, a, da, ...
+    function out_r = solve_given_r(r)
+        % ----- punto fijo en Gpc -----
+        Gpc = 0.0;
+        for itG = 1:12
+            [V, c, A, rr1, rr2] = solve_HJB_given_Gpc(r, a, da, ...
+                sI,sF,rho, z1,z2, tau_l,tau_c, phi, theta_I,theta_F, ...
+                psi_G,omegaG, Gpc, sigma_a,nu, Aswitch, maxit_V,crit_V,Delta);
+
+            % Fokker-Planck implícito (pseudo-tiempo)
+            g = solve_FP(A, I, da);
+
+            % Agregados
+            popI = sum(g(:,1))*da;  popF = sum(g(:,2))*da;  massT = popI + popF;
+            Ctot = sum(c(:,1).*g(:,1))*da + sum(c(:,2).*g(:,2))*da;
+            Y    = z1*popI + z2*popF;
+
+            % Bono público
+            if strcmpi(B_mode,'ratio_to_Y'), B = Bbar*Y; else, B = Bbar; end
+            rB = r*B;
+
+            % Fiscal: cierre por G o G fijo
+            Tl = tau_l*z2*popF;
+            Tc = tau_c*Ctot;
+            Tr = phi*z1*popI;
+            if strcmpi(gov_mode,'close_by_G')
+                Gx  = Tl + Tc - Tr - rB;  % PB = rB, BB = 0
+                PB  = rB;  BB = 0.0;
+            else
+                Gx  = G_fixed;
+                PB  = Tl + Tc - Tr - Gx;
+                BB  = PB - rB;
+            end
+            Gpc_new = Gx / max(massT,1e-12);
+
+            if abs(Gpc_new - Gpc) < 1e-9, break; end
+            Gpc = 0.6*Gpc + 0.4*Gpc_new;
+        end
+
+        % Cierre financiero
+        A_priv = g(:,1)'*a*da + g(:,2)'*a*da;
+        S = A_priv - B;
+
+        % Políticas de ahorro
+        s_pol = [ z1 + rr1.*a + phi*z1 - (1+tau_c)*c(:,1), ...
+                  (1-tau_l)*z2 + rr2.*a - (1+tau_c)*c(:,2) ];
+
+        % Stats
+        [wI_mean,wF_mean,wT_mean] = deal(wmean(a,g(:,1),da), wmean(a,g(:,2),da), wmean(a,g(:,1)+g(:,2),da));
+        [wI_med,wF_med,wT_med]   = deal(wmedian(a,g(:,1),da), wmedian(a,g(:,2),da), wmedian(a,g(:,1)+g(:,2),da));
+        [giniW_I,giniW_F,giniW_T]= deal(giniW(a,g(:,1),da),giniW(a,g(:,2),da),giniW(a,g(:,1)+g(:,2),da));
+        [cI_mean,cF_mean,cT_mean]= deal(wmean(c(:,1),g(:,1),da),wmean(c(:,2),g(:,2),da),wmean(c(:,1)+c(:,2),g(:,1)+g(:,2),da));
+        [cI_med,cF_med,cT_med]   = deal(wmedian(c(:,1),g(:,1),da),wmedian(c(:,2),g(:,2),da),wmedian([c(:,1);c(:,2)],[g(:,1);g(:,2)],da));
+        [giniC_I,giniC_F,giniC_T]= deal(giniX(c(:,1),g(:,1),da),giniX(c(:,2),g(:,2),da),giniX([c(:,1);c(:,2)],[g(:,1);g(:,2)],da));
+
+        % Residuo HJB
+        u_check = [u_mult(c(:,1),Gpc,sI,psi_G,omegaG), u_mult(c(:,2),Gpc,sF,psi_G,omegaG)];
+        R = rho*[V(:,1);V(:,2)] - [u_check(:,1);u_check(:,2)] - A*[V(:,1);V(:,2)];
+        hjb_res = max(abs(R));
+
+        % Deudores / Ahorradores
+        idxB=(a<0); idxL=(a>0);
+        fracBorrow_I=sum(g(idxB,1))*da / max(sum(g(:,1))*da,1e-12);
+        fracBorrow_F=sum(g(idxB,2))*da / max(sum(g(:,2))*da,1e-12);
+        fracLend_I  =sum(g(idxL,1))*da / max(sum(g(:,1))*da,1e-12);
+        fracLend_F  =sum(g(idxL,2))*da / max(sum(g(:,2))*da,1e-12);
+        volBorrow_I =sum(g(idxB,1).*a(idxB))*da;
+        volBorrow_F =sum(g(idxB,2).*a(idxB))*da;
+        volLend_I   =sum(g(idxL,1).*a(idxL))*da;
+        volLend_F   =sum(g(idxL,2).*a(idxL))*da;
+
+        % Output
+        out_r.r = r; out_r.a = a; out_r.g = g; out_r.c = c; out_r.s = s_pol;
+        out_r.popI = popI; out_r.popF = popF; out_r.Ctot = Ctot; out_r.Y = Y;
+        out_r.S_residual = S; out_r.hjb_residual = hjb_res; out_r.Gpc = Gpc;
+
+        B_over_Y = B / max(Y,1e-12);
+        out_r.fiscal = struct('Tl',Tl,'Tc',Tc,'Tr',Tr,'G',Gx,'B',B,'rB',rB,'PB',PB,'BB',BB, ...
+                              'B_over_Y', B_over_Y);
+
+        out_r.stats = struct('wealth_mean',[wI_mean wF_mean wT_mean], ...
+                             'wealth_median',[wI_med wF_med wT_med], ...
+                             'giniW',[giniW_I giniW_F giniW_T], ...
+                             'cons_mean',[cI_mean cF_mean cT_mean], ...
+                             'cons_median',[cI_med cF_med cT_med], ...
+                             'giniC',[giniC_I giniC_F giniC_T], 'p11',p11_rep);
+
+        out_r.borrowers = struct('fracBorrow',[fracBorrow_I fracBorrow_F], ...
+                                 'fracLend',[fracLend_I fracLend_F], ...
+                                 'volBorrow',[volBorrow_I volBorrow_F], ...
+                                 'volLend',[volLend_I volLend_F]);
+
+        if report_G
+            mu_mult_I = (1+psi_G*Gpc)^(omegaG*(1-sI));
+            mu_mult_F = (1+psi_G*Gpc)^(omegaG*(1-sF));
+            u_mult_fac= (1+psi_G*Gpc)^(omegaG);
+            out_r.G_effects = struct('mu_mult_I',mu_mult_I,'mu_mult_F',mu_mult_F,'u_mult',u_mult_fac,'Gpc',Gpc);
+        else
+            out_r.G_effects = struct();
+        end
+
+        out_r.params.public_good = struct('psi_G',psi_G,'omegaG',omegaG);
+        out_r.r_path = r; out_r.S_path = S; % trazas simples
+    end
+
+% =================== subfunciones (nivel 2) ===================
+    function [V, c, A, rr1, rr2] = solve_HJB_given_Gpc(r, a, da, ...
             sI,sF,rho, z1,z2, tau_l,tau_c, phi, theta_I,theta_F, ...
             psi_G,omegaG, Gpc, sigma_a,nu, Aswitch, maxit_V,crit_V,Delta)
 
@@ -173,7 +206,6 @@ out.r_path = r_path; out.S_path = S_path;
         V(:,1) = u_CRRA(max((z1 + rr1.*a + phi*z1)/(1+tau_c),1e-12), sI)/rho;
         V(:,2) = u_CRRA(max(((1-tau_l)*z2 + rr2.*a)/(1+tau_c),1e-12), sF)/rho;
 
-        % Factor multiplicativo en MU
         facI = (1+psi_G*Gpc)^(omegaG*(1-sI));
         facF = (1+psi_G*Gpc)^(omegaG*(1-sF));
 
@@ -187,7 +219,7 @@ out.r_path = r_path; out.S_path = S_path;
             rr1 = r*ones(I,1); rr1(a<0)=r+theta_I;
             rr2 = r*ones(I,1); rr2(a<0)=r+theta_F;
 
-            % Condiciones de frontera coherentes con IVA y fac
+            % Fronteras
             c_inf_max = max((z1 + rr1(end)*a(end) + phi*z1)/(1+tau_c),1e-12);
             c_for_max = max(((1-tau_l)*z2 + rr2(end)*a(end))/(1+tau_c),1e-12);
             c_inf_min = max((z1 + rr1(1)*a(1) + phi*z1)/(1+tau_c),1e-12);
@@ -198,11 +230,11 @@ out.r_path = r_path; out.S_path = S_path;
             dVb(1,1) = (1+tau_c)*facI*u_CRRA_prime(c_inf_min,sI);
             dVb(1,2) = (1+tau_c)*facF*u_CRRA_prime(c_for_min,sF);
 
-            % Recursos antes de c
+            % Recursos previos a c
             res_inf = z1 + rr1.*a + phi*z1;
             res_for = (1-tau_l)*z2 + rr2.*a;
 
-            % ---- Euler CORREGIDA ----
+            % Euler (corrigiendo por IVA y multiplicador MU)
             cf = [max(dVf(:,1)./((1+tau_c)*facI),1e-12).^(-1/sI), ...
                   max(dVf(:,2)./((1+tau_c)*facF),1e-12).^(-1/sF)];
             cb = [max(dVb(:,1)./((1+tau_c)*facI),1e-12).^(-1/sI), ...
@@ -214,8 +246,10 @@ out.r_path = r_path; out.S_path = S_path;
             If = ssf>0; Ib = ssb<0; I0 = (1-If-Ib);
             c  = max( cf.*If + cb.*Ib + c0.*(I0/(1+tau_c)), 1e-12 );
 
+            % Utilidad flujo
             u = [u_mult(c(:,1),Gpc,sI,psi_G,omegaG), u_mult(c(:,2),Gpc,sF,psi_G,omegaG)];
 
+            % Generador (drift + difusión + switching)
             X = max(-ssb,0)/da;  Z = max(ssf,0)/da;  X(1,:)=0; Z(I,:)=0; Y=-(X+Z);
             A1 = spdiags(Y(:,1),0,I,I) + spdiags(X(2:I,1),-1,I,I) + spdiags([0;Z(1:I-1,1)],1,I,I);
             A2 = spdiags(Y(:,2),0,I,I) + spdiags(X(2:I,2),-1,I,I) + spdiags([0;Z(1:I-1,2)],1,I,I);
