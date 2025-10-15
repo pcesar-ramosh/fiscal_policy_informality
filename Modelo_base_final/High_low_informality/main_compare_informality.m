@@ -32,10 +32,10 @@ cfg0.sigma_a = 0.010;
 
 % Government / Debt
 cfg0.B_mode  = 'ratio_to_Y';     % 'ratio_to_Y' or 'level'
-cfg0.Bbar    = 0.35;             % ratio B/Y if 'ratio_to_Y' (or level if 'level')
+cfg0.Bbar   =0.8; % = 0.35;             % ratio B/Y if 'ratio_to_Y' (or level if 'level')
 cfg0.alphaG  = 0.50;
-cfg0.clamp_G_to_zero = true;
-cfg0.G_cap_ratio = 0.08;
+cfg0.clamp_G_to_zero = true;   % True poner falso
+cfg0.G_cap_ratio = 1; %=0.08;
 
 % --------------------------- Scenarios -----------------------------------
 sc = struct('name',{},'cfg',{},'sol',{});
